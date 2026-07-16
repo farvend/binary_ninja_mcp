@@ -13,6 +13,9 @@ from ..core.config import Config
 from ..utils.number_utils import convert_number as util_convert_number
 from ..utils.string_utils import parse_int_or_default
 
+DATA_DECL_PREVIEW_BYTES = 4096
+DATA_DECL_MAX_BYTES = 1024 * 1024
+
 
 class MCPRequestHandler(BaseHTTPRequestHandler):
     binary_ops = None  # Will be set by the server
@@ -665,14 +668,36 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
                                 size = int(inferred)
                         except Exception:
                             pass
+                    size_known = size is not None
                     if size is None:
                         size = 64
 
+                    requested_length = parse_int_or_default(params.get("length"), -1)
+                    if requested_length > DATA_DECL_MAX_BYTES:
+                        self._send_json_response(
+                            {
+                                "error": "Requested data declaration hexdump is too large",
+                                "requested_length": requested_length,
+                                "max_length": DATA_DECL_MAX_BYTES,
+                                "help": "Request a smaller length or use hexdump_address in chunks",
+                            },
+                            400,
+                        )
+                        return
+                    if requested_length < 0:
+                        read_length = min(size, DATA_DECL_PREVIEW_BYTES)
+                    elif size_known:
+                        read_length = min(requested_length, size)
+                    else:
+                        read_length = requested_length
+
                     # Read bytes
                     try:
-                        raw = self.binary_ops.current_view.read(addr, size) or b""
+                        raw = self.binary_ops.current_view.read(addr, read_length) or b""
                     except Exception:
                         raw = b""
+                    bytes_read = len(raw)
+                    truncated = (size_known and bytes_read < size) or bytes_read < read_length
 
                     # Build a declaration string (best-effort)
                     decl = None
@@ -681,7 +706,7 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
                         is_char_array = (type_text or "").lower().startswith(
                             "char"
                         ) or "char [" in (type_text or "").lower()
-                        if is_char_array and raw:
+                        if is_char_array and raw and not truncated:
                             esc = self._c_escape(raw.rstrip(b"\x00"))
                             decl = f"{type_text} {label} = {esc};"
                         else:
@@ -730,6 +755,9 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
                             "address": hex(addr),
                             "name": label,
                             "size": size,
+                            "size_known": size_known,
+                            "bytes_read": bytes_read,
+                            "truncated": truncated,
                             "type": type_text,
                             "decl": decl,
                             "hexdump": hexdump_text,
