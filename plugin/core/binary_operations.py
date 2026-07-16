@@ -29,14 +29,15 @@ class BinaryOperations:
     def current_view(self, bv: bn.BinaryView | None):
         if bv is self._current_view:
             return
-        self._current_view = bv
         if bv:
-            bn.log_info(f"Set current binary view: {bv.file.filename}")
             try:
                 self._register_view(bv)
             except Exception:
                 pass
+            self._current_view = bv
+            bn.log_info(f"Set current binary view: {bv.file.filename}")
         else:
+            self._current_view = None
             bn.log_info("Cleared current binary view")
 
     def load_binary(self, filepath: str) -> bn.BinaryView:
@@ -222,7 +223,7 @@ class BinaryOperations:
                 vb_canon = vb
             entries.append((canonical_id, fn, bool(vb_canon is self._current_view)))
         # Sort by filename for stable ordering
-        entries.sort(key=lambda t: (t[1] or ""))
+        entries.sort(key=lambda t: t[1] or "")
         for cid, fn, active in entries:
             items.append({"id": cid, "filename": fn, "active": active})
         return items
