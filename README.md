@@ -160,6 +160,8 @@ Your task is to analyze an unknown file which is currently open in Binary Ninja.
 
 ## Supported Capabilities
 
+MCP tools include safety annotations so clients can distinguish read-only inspection from analysis mutations. Byte patching is additionally marked as destructive.
+
 The following table lists the available MCP functions for use:
 
 | Function                                                             | Description                                                                                                  |
