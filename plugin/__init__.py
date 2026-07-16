@@ -125,6 +125,9 @@ def _try_autostart_for_bv(bv):
         if _mcp_user_stopped:
             bn.log_debug("MCP Max autostart suppressed due to manual stop")
             return
+        if _is_server_running():
+            plugin.server.binary_ops.current_view = bv
+            return
         plugin.start_server(bv)
     except Exception as e:
         bn.log_error(f"MCP Max autostart failed: {e}")

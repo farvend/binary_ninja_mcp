@@ -70,6 +70,17 @@ class BinaryOperationsTests(unittest.TestCase):
         self.assertEqual(len(self.operations._views_by_id), 1)
         self.assertEqual(self.info_logs, ["Set current binary view: sample.bndb"])
 
+    def test_replacement_view_for_same_file_updates_silently(self):
+        first_view = FakeView("sample.bndb")
+        replacement_view = FakeView("sample.bndb")
+
+        self.operations.current_view = first_view
+        self.operations.current_view = replacement_view
+
+        self.assertIs(self.operations.current_view, replacement_view)
+        self.assertEqual(len(self.operations._views_by_id), 1)
+        self.assertEqual(self.info_logs, ["Set current binary view: sample.bndb"])
+
 
 if __name__ == "__main__":
     unittest.main()

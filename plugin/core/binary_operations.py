@@ -30,15 +30,25 @@ class BinaryOperations:
         if bv is self._current_view:
             return
         if bv:
+            previous_filename = self._view_filename(self._current_view)
             try:
                 self._register_view(bv)
             except Exception:
                 pass
             self._current_view = bv
-            bn.log_info(f"Set current binary view: {bv.file.filename}")
+            current_filename = self._view_filename(bv)
+            if current_filename != previous_filename:
+                bn.log_info(f"Set current binary view: {current_filename}")
         else:
             self._current_view = None
             bn.log_info("Cleared current binary view")
+
+    @staticmethod
+    def _view_filename(bv: bn.BinaryView | None) -> str | None:
+        try:
+            return str(bv.file.filename) if bv and bv.file else None
+        except Exception:
+            return None
 
     def load_binary(self, filepath: str) -> bn.BinaryView:
         """Load a binary file using the appropriate method based on the Binary Ninja API version"""
