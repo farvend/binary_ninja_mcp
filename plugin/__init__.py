@@ -47,7 +47,7 @@ class BinaryNinjaMCP:
                 _show_no_bv_popup()
                 return
             # Avoid duplicate starts
-            if self.server and self.server.server:
+            if self.server and self.server.is_running:
                 bn.log_info("MCP Max server already running; skip new start")
                 # Ensure BV is set if not already
                 if self.server.binary_ops.current_view is None:
@@ -83,7 +83,7 @@ class BinaryNinjaMCP:
     def stop_server(self, bv):
         try:
             # If not running, inform the user
-            if not (self.server and self.server.server):
+            if not (self.server and self.server.is_running):
                 bn.log_info("MCP Max server stop requested but server is not running")
                 _show_popup("MCP Server", "Server is not running.")
                 return
@@ -266,7 +266,7 @@ def _ensure_status_indicator():
 
             # Set initial visible state so the indicator shows up immediately
             try:
-                running_now = bool(plugin.server and plugin.server.server)
+                running_now = bool(plugin.server and plugin.server.is_running)
             except Exception:
                 running_now = False
             if running_now:
@@ -283,7 +283,7 @@ def _ensure_status_indicator():
             # Click handler to toggle server state
             def _on_click():
                 try:
-                    running = bool(plugin.server and plugin.server.server)
+                    running = bool(plugin.server and plugin.server.is_running)
                     if running:
                         plugin.stop_server(None)
                     else:
@@ -304,7 +304,7 @@ def _ensure_status_indicator():
                             return
                         plugin.start_server(bv)
                 finally:
-                    _set_status_indicator(bool(plugin.server and plugin.server.server))
+                    _set_status_indicator(bool(plugin.server and plugin.server.is_running))
 
             _status_button.clicked.connect(_on_click)
 
@@ -376,7 +376,7 @@ def _start_indicator_watcher():
         def _tick():
             try:
                 _ensure_status_indicator()
-                _set_status_indicator(bool(plugin.server and plugin.server.server))
+                _set_status_indicator(bool(plugin.server and plugin.server.is_running))
                 if _status_button is not None and hasattr(_indicator_timer, "stop"):
                     _indicator_timer.stop()
             except Exception:
@@ -410,7 +410,7 @@ def _schedule_status_init():
         def _init_once():
             try:
                 _ensure_status_indicator()
-                _set_status_indicator(bool(plugin.server and plugin.server.server))
+                _set_status_indicator(bool(plugin.server and plugin.server.is_running))
             except Exception:
                 pass
 
@@ -603,7 +603,7 @@ try:
         def __init__(self):
             super().__init__()
             ui.UIContext.registerNotification(self)
-        
+
         def _get_active_bv(self):
             try:
                 ctx = ui.UIContext.activeContext()
@@ -620,7 +620,7 @@ try:
                 bv = self._get_active_bv()
                 # Ensure the status indicator exists and reflects current state
                 _ensure_status_indicator()
-                _set_status_indicator(bool(plugin.server and plugin.server.server))
+                _set_status_indicator(bool(plugin.server and plugin.server.is_running))
                 _start_indicator_watcher()
                 _start_bv_monitor()
                 if bv:
@@ -639,7 +639,7 @@ try:
                 bv = self._get_active_bv()
                 # Ensure the status indicator is present as soon as a file opens
                 _ensure_status_indicator()
-                _set_status_indicator(bool(plugin.server and plugin.server.server))
+                _set_status_indicator(bool(plugin.server and plugin.server.is_running))
                 _start_indicator_watcher()
                 _start_bv_monitor()
                 if bv:
@@ -677,7 +677,7 @@ try:
         def OnContextOpen(self, *args):  # type: ignore[override]
             try:
                 _ensure_status_indicator()
-                _set_status_indicator(bool(plugin.server and plugin.server.server))
+                _set_status_indicator(bool(plugin.server and plugin.server.is_running))
                 _start_indicator_watcher()
             except Exception:
                 pass
@@ -732,7 +732,7 @@ except Exception:
 
 def _is_server_running() -> bool:
     try:
-        return bool(plugin.server and plugin.server.server)
+        return bool(plugin.server and plugin.server.is_running)
     except Exception:
         return False
 
