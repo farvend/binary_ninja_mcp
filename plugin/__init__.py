@@ -58,7 +58,6 @@ class BinaryNinjaMCP:
                         self.server.binary_ops.register_view(bv)
                     except Exception:
                         pass
-                _show_popup("MCP Server", "Server is already running.")
                 return
             self.server.binary_ops.current_view = bv
             try:
@@ -68,14 +67,7 @@ class BinaryNinjaMCP:
             self.server.start()
             global _mcp_user_stopped
             _mcp_user_stopped = False
-            bn.log_info(
-                f"MCP server started successfully on http://{self.config.server.host}:{self.config.server.port}"
-            )
             _set_status_indicator(True)
-            _show_popup(
-                "MCP Server Started",
-                f"Running at http://{self.config.server.host}:{self.config.server.port}",
-            )
         except Exception as e:
             bn.log_error(f"Failed to start MCP server: {e!s}")
             _show_popup("MCP Server Error", f"Failed to start: {e}")

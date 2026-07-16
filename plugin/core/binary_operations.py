@@ -27,6 +27,8 @@ class BinaryOperations:
 
     @current_view.setter
     def current_view(self, bv: bn.BinaryView | None):
+        if bv is self._current_view:
+            return
         self._current_view = bv
         if bv:
             bn.log_info(f"Set current binary view: {bv.file.filename}")
