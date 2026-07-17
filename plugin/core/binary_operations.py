@@ -2648,106 +2648,61 @@ class BinaryOperations:
 
         return result
 
-    def get_xrefs_to_field(self, struct_name: str, field_name: str) -> list[dict[str, Any]]:
-        """Get all cross references to a named struct field (member).
-
-        This uses a best-effort heuristic:
-        - Scans HLIL for occurrences of the field name (e.g., ".field" or "->field")
-        - If a global instance of the struct is found, computes the field's absolute
-          address (base + offset) and includes code refs to that address
-        """
+    def get_xrefs_to_field(
+        self, struct_name: str, field_name: str, max_results: int = 100
+    ) -> list[dict[str, Any]]:
+        """Get indexed code and data references to a named structure field."""
         if not self._current_view:
             raise RuntimeError("No binary loaded")
 
         struct_name = str(struct_name).strip()
         field_name = str(field_name).strip()
+        max_results = max(1, min(int(max_results), 1000))
         results: list[dict[str, Any]] = []
 
-        # Try to resolve struct member offset
-        member_offset = None
-        try:
-            if hasattr(self._current_view, "types") and self._current_view.types:
-                for t in self._current_view.types.values():
-                    try:
-                        if (
-                            getattr(t, "name", None) == struct_name
-                            and hasattr(t, "structure")
-                            and t.structure
-                        ):
-                            for m in getattr(t, "members", getattr(t.structure, "members", [])):
-                                if getattr(m, "name", None) == field_name and hasattr(m, "offset"):
-                                    member_offset = int(m.offset)
-                                    break
-                            if member_offset is not None:
-                                break
-                    except Exception:
-                        continue
-        except Exception:
-            pass
+        get_type = getattr(self._current_view, "get_type_by_name", None)
+        typ = get_type(struct_name) if callable(get_type) else None
+        if typ is None:
+            raise ValueError(f"Type not found: {struct_name}")
 
-        # HLIL scan for textual member access
-        import re
+        members = getattr(typ, "members", None)
+        if members is None:
+            structure = getattr(typ, "structure", None)
+            members = getattr(structure, "members", []) if structure is not None else []
+        member = next((m for m in members if str(getattr(m, "name", "")) == field_name), None)
+        if member is None or not hasattr(member, "offset"):
+            raise ValueError(f"Field not found: {struct_name}.{field_name}")
+        member_offset = int(member.offset)
 
-        pattern = re.compile(rf"(\.|->)\s*{re.escape(field_name)}(\b|\W)")
-        for func in list(self._current_view.functions):
-            try:
-                if not hasattr(func, "hlil") or not func.hlil:
-                    continue
-                for ins in func.hlil.instructions:
-                    try:
-                        text = str(ins)
-                        if pattern.search(text):
-                            results.append(
-                                {
-                                    "kind": "hlil-match",
-                                    "function": func.name,
-                                    "address": hex(getattr(ins, "address", func.start)),
-                                    "text": text,
-                                }
-                            )
-                    except Exception:
-                        continue
-            except Exception:
-                continue
+        get_code_refs = getattr(self._current_view, "get_code_refs_for_type_field", None)
+        if not callable(get_code_refs):
+            raise RuntimeError(
+                "This Binary Ninja version does not support indexed type-field xrefs"
+            )
 
-        # If we know the member offset, try to find global instances and code-refs
-        if member_offset is not None:
-            try:
-                for var_addr in list(self._current_view.data_vars):
-                    try:
-                        t = None
-                        if hasattr(self._current_view, "get_type_at"):
-                            t = self._current_view.get_type_at(var_addr)
-                        t_str = str(t) if t is not None else ""
-                        # crude match for exact or pointer to struct
-                        if (
-                            t_str == struct_name
-                            or t_str.endswith(f"* {struct_name}")
-                            or struct_name in t_str
-                        ):
-                            field_addr = var_addr + member_offset
-                            # code refs to this absolute address
-                            try:
-                                for ref in list(self._current_view.get_code_refs(field_addr)):
-                                    fn_name = (
-                                        ref.function.name
-                                        if getattr(ref, "function", None)
-                                        else None
-                                    )
-                                    results.append(
-                                        {
-                                            "kind": "global-field-ref",
-                                            "function": fn_name,
-                                            "address": hex(ref.address),
-                                            "field_address": hex(field_addr),
-                                        }
-                                    )
-                            except Exception:
-                                pass
-                    except Exception:
-                        continue
-            except Exception:
-                pass
+        for ref in get_code_refs(struct_name, member_offset, max_items=max_results):
+            address = getattr(ref, "address", None)
+            function = getattr(ref, "function", None)
+            results.append(
+                {
+                    "kind": "code-field-ref",
+                    "function": getattr(function, "name", None),
+                    "address": hex(int(address)) if address is not None else None,
+                    "field_offset": member_offset,
+                }
+            )
+
+        remaining = max_results - len(results)
+        get_data_refs = getattr(self._current_view, "get_data_refs_for_type_field", None)
+        if remaining > 0 and callable(get_data_refs):
+            for address in get_data_refs(struct_name, member_offset, max_items=remaining):
+                results.append(
+                    {
+                        "kind": "data-field-ref",
+                        "address": hex(int(address)),
+                        "field_offset": member_offset,
+                    }
+                )
 
         return results
 

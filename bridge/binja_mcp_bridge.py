@@ -701,11 +701,14 @@ def get_xrefs_to(address: str) -> list:
 
 
 @mcp.tool()
-def get_xrefs_to_field(struct_name: str, field_name: str) -> list:
+def get_xrefs_to_field(struct_name: str, field_name: str, max_results: int = 100) -> list:
     """
     Get all cross references to a named struct field (member).
     """
-    return safe_get("getXrefsToField", {"struct": struct_name, "field": field_name})
+    return safe_get(
+        "getXrefsToField",
+        {"struct": struct_name, "field": field_name, "maxResults": max_results},
+    )
 
 
 @mcp.tool()

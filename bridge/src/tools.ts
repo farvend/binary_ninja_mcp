@@ -606,9 +606,14 @@ export function registerTools(server: McpServer, client: BinjaHttpClient): void 
     {
       struct_name: z.string().describe("Struct name"),
       field_name: z.string().describe("Field name"),
+      max_results: z.number().int().min(1).max(1000).default(100).describe("Maximum references"),
     },
-    async ({ struct_name, field_name }) => {
-      const lines = await client.getLines("getXrefsToField", { struct: struct_name, field: field_name });
+    async ({ struct_name, field_name, max_results = 100 }) => {
+      const lines = await client.getLines("getXrefsToField", {
+        struct: struct_name,
+        field: field_name,
+        maxResults: max_results,
+      });
       return { content: [{ type: "text", text: lines.join("\n") }] };
     }
   );
