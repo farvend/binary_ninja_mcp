@@ -644,12 +644,16 @@ export function registerTools(server: McpServer, client: BinjaHttpClient): void 
 
   server.tool(
     "get_xrefs_to_enum",
-    "Get usages/xrefs of an enum by scanning for member values and matches.",
+    "Get indexed, bounded code and data references to an enum type.",
     {
       enum_name: z.string().describe("Enum name"),
+      max_results: z.number().int().min(1).max(1000).default(100).describe("Maximum references"),
     },
-    async ({ enum_name }) => {
-      const lines = await client.getLines("getXrefsToEnum", { name: enum_name });
+    async ({ enum_name, max_results = 100 }) => {
+      const lines = await client.getLines("getXrefsToEnum", {
+        name: enum_name,
+        maxResults: max_results,
+      });
       return { content: [{ type: "text", text: lines.join("\n") }] };
     }
   );

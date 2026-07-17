@@ -729,11 +729,11 @@ def get_xrefs_to_type(type_name: str) -> list:
 
 
 @mcp.tool()
-def get_xrefs_to_enum(enum_name: str) -> list:
+def get_xrefs_to_enum(enum_name: str, max_results: int = 100) -> list:
     """
-    Get usages/xrefs of an enum by scanning for member values and matches.
+    Get indexed, bounded code and data references to an enum type.
     """
-    return safe_get("getXrefsToEnum", {"name": enum_name})
+    return safe_get("getXrefsToEnum", {"name": enum_name, "maxResults": max_results})
 
 
 @mcp.tool()

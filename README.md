@@ -182,7 +182,7 @@ The following table lists the available MCP functions for use:
 | `get_data_decl(name_or_address, length)`                             | Return a C-like declaration and a hexdump for a data symbol or address.                                      |
 | `hexdump_address(address, length)`                                   | Text hexdump at address. `length < 0` reads exact defined size if available.                                 |
 | `hexdump_data(name_or_address, length)`                              | Hexdump by data symbol name or address. `length < 0` reads exact defined size if available.                  |
-| `get_xrefs_to_enum(enum_name)`                                       | Get usages related to an enum (matches member constants in code).                                            |
+| `get_xrefs_to_enum(enum_name, max_results)`                          | Get indexed, bounded code and data references to an enum type.                                               |
 | `get_xrefs_to_field(struct_name, field_name, max_results)`           | Get indexed, bounded cross references to a named struct field.                                               |
 | `get_xrefs_to_struct(struct_name)`                                   | Get xrefs/usages related to a struct (members, globals, code refs).                                          |
 | `get_xrefs_to_type(type_name)`                                       | Get xrefs/usages related to a struct/type (globals, refs, HLIL matches).                                     |

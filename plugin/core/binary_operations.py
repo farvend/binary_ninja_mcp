@@ -2810,122 +2810,56 @@ class BinaryOperations:
 
         return result
 
-    def get_xrefs_to_enum(self, enum_name: str) -> dict[str, Any]:
-        """Find usages of an enum by matching its member values in code and variables.
-
-        Notes:
-        - Enums are values, not addresses; there are no traditional "data references" to enums.
-        - This scans for immediate constants equal to enum members and common bitmask checks.
-        """
+    def get_xrefs_to_enum(self, enum_name: str, max_results: int = 100) -> dict[str, Any]:
+        """Get indexed code and data references to an enum type."""
         if not self._current_view:
             raise RuntimeError("No binary loaded")
 
         enum_name_str = str(enum_name).strip()
-        en_lower = enum_name_str.lower()
+        max_results = max(1, min(int(max_results), 1000))
 
         result: dict[str, Any] = {
             "enum": enum_name_str,
-            "members": [],  # [{name, value}]
-            "usages": [],  # [{function, address, text, member, value}]
+            "members": [],
+            "usages": [],
         }
 
-        # Locate the enum type and collect members
-        enum_type = None
-        try:
-            for t in self._current_view.types.values():
-                try:
-                    # Match by exact name or case-insensitive
-                    if getattr(t, "type_class", None) == TypeClass.EnumerationTypeClass:
-                        tname = getattr(t, "name", None)
-                        if tname and tname.lower() == en_lower:
-                            enum_type = t
-                            break
-                except Exception:
-                    continue
-        except Exception:
-            pass
-
-        # If not found by exact name, try substring match
+        get_type = getattr(self._current_view, "get_type_by_name", None)
+        enum_type = get_type(enum_name_str) if callable(get_type) else None
         if enum_type is None:
-            try:
-                for t in self._current_view.types.values():
-                    try:
-                        if getattr(t, "type_class", None) == TypeClass.EnumerationTypeClass:
-                            tname = getattr(t, "name", "")
-                            if tname and en_lower in tname.lower():
-                                enum_type = t
-                                break
-                    except Exception:
-                        continue
-            except Exception:
-                pass
+            raise ValueError(f"Enum not found: {enum_name_str}")
 
-        members: list[dict[str, Any]] = []
-        values: list[int] = []
-        if enum_type is not None:
-            try:
-                for m in getattr(enum_type, "members", []):
-                    try:
-                        name = getattr(m, "name", None)
-                        val = getattr(m, "value", None)
-                        if name is not None and isinstance(val, int):
-                            members.append({"name": name, "value": val})
-                            values.append(val)
-                    except Exception:
-                        continue
-            except Exception:
-                pass
+        for member in getattr(enum_type, "members", []):
+            name = getattr(member, "name", None)
+            value = getattr(member, "value", None)
+            if name is not None and isinstance(value, int):
+                result["members"].append({"name": str(name), "value": value})
 
-        result["members"] = members
+        get_code_refs = getattr(self._current_view, "get_code_refs_for_type", None)
+        if not callable(get_code_refs):
+            raise RuntimeError("This Binary Ninja version does not support indexed type xrefs")
 
-        # Build simple patterns for HLIL text matching of constants (hex)
-        import re
-
-        hex_patterns = []
-        for v in values:
-            hex_patterns.append(re.compile(rf"0x{v:x}\b", re.IGNORECASE))
-        # Also a single combined pattern to speed up
-        combined_hex = None
-        if values:
-            combined_hex = re.compile(
-                r"(" + "|".join([rf"0x{v:x}\b" for v in values]) + ")", re.IGNORECASE
+        for ref in get_code_refs(enum_name_str, max_items=max_results):
+            address = getattr(ref, "address", None)
+            function = getattr(ref, "function", None)
+            result["usages"].append(
+                {
+                    "kind": "code-type-ref",
+                    "function": getattr(function, "name", None),
+                    "address": hex(int(address)) if address is not None else None,
+                }
             )
 
-        # Scan functions for matches
-        for func in list(self._current_view.functions):
-            try:
-                if hasattr(func, "hlil") and func.hlil:
-                    for ins in func.hlil.instructions:
-                        try:
-                            text = str(ins)
-                            matched_val = None
-                            if combined_hex is not None:
-                                m = combined_hex.search(text)
-                                if m:
-                                    # parse the matched hex back to int to map member name
-                                    try:
-                                        matched_val = int(m.group(0), 16)
-                                    except Exception:
-                                        matched_val = None
-                            if matched_val is not None:
-                                member_name = None
-                                for mem in members:
-                                    if mem["value"] == matched_val:
-                                        member_name = mem["name"]
-                                        break
-                                result["usages"].append(
-                                    {
-                                        "function": func.name,
-                                        "address": hex(getattr(ins, "address", func.start)),
-                                        "text": text,
-                                        "member": member_name,
-                                        "value": matched_val,
-                                    }
-                                )
-                        except Exception:
-                            continue
-            except Exception:
-                continue
+        remaining = max_results - len(result["usages"])
+        get_data_refs = getattr(self._current_view, "get_data_refs_for_type", None)
+        if remaining > 0 and callable(get_data_refs):
+            for address in get_data_refs(enum_name_str, max_items=remaining):
+                result["usages"].append(
+                    {
+                        "kind": "data-type-ref",
+                        "address": hex(int(address)),
+                    }
+                )
 
         return result
 

@@ -123,6 +123,38 @@ class IndexedFieldXrefView:
         raise AssertionError("field xrefs must not scan data variables")
 
 
+class IndexedEnumXrefView:
+    def __init__(self):
+        self.code_query = None
+        self.data_query = None
+
+    def get_type_by_name(self, name):
+        if name != "PlayerState":
+            return None
+        members = [
+            types.SimpleNamespace(name="Idle", value=0),
+            types.SimpleNamespace(name="Running", value=1),
+        ]
+        return types.SimpleNamespace(members=members)
+
+    def get_code_refs_for_type(self, name, max_items=None):
+        self.code_query = (name, max_items)
+        function = types.SimpleNamespace(name="update_state")
+        return [types.SimpleNamespace(address=0x402000, function=function)]
+
+    def get_data_refs_for_type(self, name, max_items=None):
+        self.data_query = (name, max_items)
+        return [0x600000]
+
+    @property
+    def functions(self):
+        raise AssertionError("enum xrefs must not scan functions or HLIL")
+
+    @property
+    def types(self):
+        raise AssertionError("enum xrefs must not scan all types")
+
+
 class BinaryOperationsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -192,6 +224,33 @@ class BinaryOperationsTests(unittest.TestCase):
                     "field_offset": 0x18,
                 },
             ],
+        )
+
+    def test_enum_xrefs_use_bounded_binary_ninja_indexes(self):
+        view = IndexedEnumXrefView()
+        self.operations._current_view = view
+
+        result = self.operations.get_xrefs_to_enum("PlayerState", max_results=2)
+
+        self.assertEqual(view.code_query, ("PlayerState", 2))
+        self.assertEqual(view.data_query, ("PlayerState", 1))
+        self.assertEqual(
+            result,
+            {
+                "enum": "PlayerState",
+                "members": [
+                    {"name": "Idle", "value": 0},
+                    {"name": "Running", "value": 1},
+                ],
+                "usages": [
+                    {
+                        "kind": "code-type-ref",
+                        "function": "update_state",
+                        "address": "0x402000",
+                    },
+                    {"kind": "data-type-ref", "address": "0x600000"},
+                ],
+            },
         )
 
 

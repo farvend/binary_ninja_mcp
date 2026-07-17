@@ -1640,8 +1640,15 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
                     )
                     return
                 try:
-                    refs = self.binary_ops.get_xrefs_to_enum(enum_name)
+                    max_results = parse_int_or_default(params.get("maxResults"), 100)
+                    max_results = parse_int_or_default(params.get("limit"), max_results)
+                    max_results = max(1, min(max_results, 1000))
+                    self._set_request_stage("indexed_enum_xrefs")
+                    refs = self.binary_ops.get_xrefs_to_enum(enum_name, max_results=max_results)
+                    self._set_request_stage("format_response")
                     self._send_json_response(refs)
+                except ValueError as e:
+                    self._send_json_response({"error": str(e)}, 404)
                 except Exception as e:
                     bn.log_error(f"Error handling getXrefsToEnum: {e}")
                     self._send_json_response({"error": str(e)}, 500)
