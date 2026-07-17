@@ -18,9 +18,18 @@ class FakeType:
 class FakeView:
     def __init__(self):
         self.read_lengths = []
+        self.data_vars_accessed = False
 
-    def get_data_var_at(self, _address):
-        return types.SimpleNamespace(type=FakeType())
+    @property
+    def data_vars(self):
+        self.data_vars_accessed = True
+        return []
+
+    def get_data_var_at(self, address):
+        return types.SimpleNamespace(type=FakeType()) if address == 0x1000 else None
+
+    def get_type_at(self, _address):
+        return None
 
     def read(self, _address, length):
         self.read_lengths.append(length)
@@ -52,7 +61,7 @@ def _load_http_server_module():
             self.current_view = FakeView()
 
         def infer_data_size(self, _address):
-            return None
+            raise AssertionError("getDataDecl must not run program-wide size inference")
 
     binary_operations.BinaryOperations = BinaryOperations
     sys.modules[binary_operations.__name__] = binary_operations
@@ -96,9 +105,9 @@ class DataDeclTests(unittest.TestCase):
     def tearDown(self):
         self.server.stop()
 
-    def request(self, query=""):
+    def request(self, query="", identifier="address=0x1000"):
         port = self.server.server.server_address[1]
-        url = f"http://127.0.0.1:{port}/getDataDecl?address=0x1000{query}"
+        url = f"http://127.0.0.1:{port}/getDataDecl?{identifier}{query}"
         with urllib.request.urlopen(url, timeout=2) as response:
             return json.load(response)
 
@@ -119,6 +128,22 @@ class DataDeclTests(unittest.TestCase):
         self.assertEqual(data["bytes_read"], 16)
         self.assertTrue(data["truncated"])
         self.assertEqual(self.server.binary_ops.current_view.read_lengths[-1], 16)
+
+    def test_auto_data_label_avoids_scanning_all_data_variables(self):
+        data = self.request("&length=16", "name=data_2000")
+
+        self.assertEqual(data["address"], "0x2000")
+        self.assertFalse(data["size_known"])
+        self.assertEqual(data["bytes_read"], 16)
+        self.assertFalse(self.server.binary_ops.current_view.data_vars_accessed)
+
+    def test_unknown_symbol_returns_without_scanning_data_variables(self):
+        with self.assertRaises(urllib.error.HTTPError) as raised:
+            self.request(identifier="name=missing_symbol")
+
+        raised.exception.close()
+        self.assertEqual(raised.exception.code, 404)
+        self.assertFalse(self.server.binary_ops.current_view.data_vars_accessed)
 
     def test_oversized_explicit_length_is_rejected(self):
         with self.assertRaises(urllib.error.HTTPError) as raised:

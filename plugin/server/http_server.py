@@ -152,7 +152,7 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
         - Parse hex address (with or without 0x)
         - get_symbol_by_raw_name
         - get_symbol_by_name
-        - scan data_vars for matching symbol name/raw_name
+        - parse Binary Ninja auto-generated data labels
         """
         bv = getattr(self.binary_ops, "current_view", None)
         if not bv:
@@ -187,23 +187,10 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
         try:
             import re as _re
 
-            m = _re.match(r"^(?i)(?:data|byte|word|dword|qword|off|unk)_(?:0x)?([0-9a-fA-F]+)$", s)
+            m = _re.match(r"(?i)^(?:data|byte|word|dword|qword|off|unk)_(?:0x)?([0-9a-f]+)$", s)
             if m:
                 a = int(m.group(1), 16)
                 return a, s
-        except Exception:
-            pass
-        # Scan data vars
-        try:
-            for var in list(bv.data_vars):
-                try:
-                    sy = bv.get_symbol_at(var)
-                    if not sy:
-                        continue
-                    if getattr(sy, "name", None) == s or getattr(sy, "raw_name", None) == s:
-                        return int(var), getattr(sy, "name", s)
-                except Exception:
-                    continue
         except Exception:
             pass
         return None, None
@@ -661,13 +648,6 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
                                 size = int(typ_obj.width)
                     except Exception:
                         pass
-                    if size is None:
-                        try:
-                            inferred = self.binary_ops.infer_data_size(addr)
-                            if inferred and inferred > 0:
-                                size = int(inferred)
-                        except Exception:
-                            pass
                     size_known = size is not None
                     if size is None:
                         size = 64
