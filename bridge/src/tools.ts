@@ -620,24 +620,32 @@ export function registerTools(server: McpServer, client: BinjaHttpClient): void 
 
   server.tool(
     "get_xrefs_to_struct",
-    "Get cross references/usages related to a struct name.",
+    "Get indexed, bounded code and data references to a struct type.",
     {
       struct_name: z.string().describe("Struct name"),
+      max_results: z.number().int().min(1).max(1000).default(100).describe("Maximum references"),
     },
-    async ({ struct_name }) => {
-      const lines = await client.getLines("getXrefsToStruct", { name: struct_name });
+    async ({ struct_name, max_results = 100 }) => {
+      const lines = await client.getLines("getXrefsToStruct", {
+        name: struct_name,
+        maxResults: max_results,
+      });
       return { content: [{ type: "text", text: lines.join("\n") }] };
     }
   );
 
   server.tool(
     "get_xrefs_to_type",
-    "Get xrefs/usages related to a struct or type name.",
+    "Get indexed, bounded code and data references to a named type.",
     {
       type_name: z.string().describe("Type name"),
+      max_results: z.number().int().min(1).max(1000).default(100).describe("Maximum references"),
     },
-    async ({ type_name }) => {
-      const lines = await client.getLines("getXrefsToType", { name: type_name });
+    async ({ type_name, max_results = 100 }) => {
+      const lines = await client.getLines("getXrefsToType", {
+        name: type_name,
+        maxResults: max_results,
+      });
       return { content: [{ type: "text", text: lines.join("\n") }] };
     }
   );
@@ -660,12 +668,16 @@ export function registerTools(server: McpServer, client: BinjaHttpClient): void 
 
   server.tool(
     "get_xrefs_to_union",
-    "Get cross references/usages related to a union type by name.",
+    "Get indexed, bounded code and data references to a union type.",
     {
       union_name: z.string().describe("Union name"),
+      max_results: z.number().int().min(1).max(1000).default(100).describe("Maximum references"),
     },
-    async ({ union_name }) => {
-      const lines = await client.getLines("getXrefsToUnion", { name: union_name });
+    async ({ union_name, max_results = 100 }) => {
+      const lines = await client.getLines("getXrefsToUnion", {
+        name: union_name,
+        maxResults: max_results,
+      });
       return { content: [{ type: "text", text: lines.join("\n") }] };
     }
   );

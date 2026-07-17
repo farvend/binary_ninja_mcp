@@ -155,6 +155,43 @@ class IndexedEnumXrefView:
         raise AssertionError("enum xrefs must not scan all types")
 
 
+class IndexedNamedTypeXrefView:
+    def __init__(self, type_name):
+        self.type_name = type_name
+        self.code_query = None
+        self.data_query = None
+
+    def get_type_by_name(self, name):
+        if name != self.type_name:
+            return None
+        member = types.SimpleNamespace(name="value", offset=4, type="int32_t")
+        return types.SimpleNamespace(members=[member])
+
+    def get_code_refs_for_type(self, name, max_items=None):
+        self.code_query = (name, max_items)
+        function = types.SimpleNamespace(name="use_named_type")
+        return [types.SimpleNamespace(address=0x403000, function=function)]
+
+    def get_data_refs_for_type(self, name, max_items=None):
+        self.data_query = (name, max_items)
+        return [0x700000]
+
+    @property
+    def functions(self):
+        raise AssertionError("named type xrefs must not scan functions or HLIL")
+
+    @property
+    def data_vars(self):
+        raise AssertionError("named type xrefs must not scan data variables")
+
+    @property
+    def types(self):
+        raise AssertionError("named type xrefs must not scan all types")
+
+    def get_symbols(self):
+        raise AssertionError("named type xrefs must not scan all symbols")
+
+
 class BinaryOperationsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -251,6 +288,47 @@ class BinaryOperationsTests(unittest.TestCase):
                     {"kind": "data-type-ref", "address": "0x600000"},
                 ],
             },
+        )
+
+    def test_type_xrefs_use_bounded_binary_ninja_indexes(self):
+        view = IndexedNamedTypeXrefView("Widget")
+        self.operations._current_view = view
+
+        result = self.operations.get_xrefs_to_type("Widget", max_results=2)
+
+        self.assertEqual(view.code_query, ("Widget", 2))
+        self.assertEqual(view.data_query, ("Widget", 1))
+        self.assertEqual(result["resolved_type"], "Widget")
+        self.assertEqual(result["functions_with_type"], ["use_named_type"])
+        self.assertEqual(len(result["code_references"]), 1)
+        self.assertEqual(len(result["data_instances"]), 1)
+
+    def test_struct_xrefs_use_bounded_binary_ninja_indexes(self):
+        view = IndexedNamedTypeXrefView("Player")
+        self.operations._current_view = view
+
+        result = self.operations.get_xrefs_to_struct("Player", max_results=2)
+
+        self.assertEqual(view.code_query, ("Player", 2))
+        self.assertEqual(view.data_query, ("Player", 1))
+        self.assertEqual(result["resolved_type"], "Player")
+        self.assertEqual(
+            result["members"],
+            [{"name": "value", "offset": 4, "type": "int32_t"}],
+        )
+
+    def test_union_xrefs_use_bounded_binary_ninja_indexes(self):
+        view = IndexedNamedTypeXrefView("Value")
+        self.operations._current_view = view
+
+        result = self.operations.get_xrefs_to_union("Value", max_results=2)
+
+        self.assertEqual(view.code_query, ("Value", 2))
+        self.assertEqual(view.data_query, ("Value", 1))
+        self.assertEqual(result["resolved_type"], "Value")
+        self.assertEqual(
+            result["members"],
+            [{"name": "value", "offset": 4, "type": "int32_t"}],
         )
 
 

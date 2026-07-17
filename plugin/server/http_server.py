@@ -1584,8 +1584,15 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
                     )
                     return
                 try:
-                    refs = self.binary_ops.get_xrefs_to_struct(struct_name)
+                    max_results = parse_int_or_default(params.get("maxResults"), 100)
+                    max_results = parse_int_or_default(params.get("limit"), max_results)
+                    max_results = max(1, min(max_results, 1000))
+                    self._set_request_stage("indexed_struct_xrefs")
+                    refs = self.binary_ops.get_xrefs_to_struct(struct_name, max_results=max_results)
+                    self._set_request_stage("format_response")
                     self._send_json_response(refs)
+                except ValueError as e:
+                    self._send_json_response({"error": str(e)}, 404)
                 except Exception as e:
                     bn.log_error(f"Error handling getXrefsToStruct: {e}")
                     self._send_json_response({"error": str(e)}, 500)
@@ -1603,8 +1610,15 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
                     )
                     return
                 try:
-                    refs = self.binary_ops.get_xrefs_to_type(type_name)
+                    max_results = parse_int_or_default(params.get("maxResults"), 100)
+                    max_results = parse_int_or_default(params.get("limit"), max_results)
+                    max_results = max(1, min(max_results, 1000))
+                    self._set_request_stage("indexed_type_xrefs")
+                    refs = self.binary_ops.get_xrefs_to_type(type_name, max_results=max_results)
+                    self._set_request_stage("format_response")
                     self._send_json_response(refs)
+                except ValueError as e:
+                    self._send_json_response({"error": str(e)}, 404)
                 except Exception as e:
                     bn.log_error(f"Error handling getXrefsToType: {e}")
                     self._send_json_response({"error": str(e)}, 500)
@@ -1748,8 +1762,15 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
                     )
                     return
                 try:
-                    refs = self.binary_ops.get_xrefs_to_union(union_name)
+                    max_results = parse_int_or_default(params.get("maxResults"), 100)
+                    max_results = parse_int_or_default(params.get("limit"), max_results)
+                    max_results = max(1, min(max_results, 1000))
+                    self._set_request_stage("indexed_union_xrefs")
+                    refs = self.binary_ops.get_xrefs_to_union(union_name, max_results=max_results)
+                    self._set_request_stage("format_response")
                     self._send_json_response(refs)
+                except ValueError as e:
+                    self._send_json_response({"error": str(e)}, 404)
                 except Exception as e:
                     bn.log_error(f"Error handling getXrefsToUnion: {e}")
                     self._send_json_response({"error": str(e)}, 500)
