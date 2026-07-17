@@ -1,3 +1,5 @@
+import atexit
+
 import binaryninja as bn
 from binaryninja import Settings
 
@@ -181,6 +183,34 @@ _status_button = None
 _status_container = None
 _indicator_timer = None
 _bv_monitor_timer = None
+_runtime_shutdown = False
+
+
+def _shutdown_runtime():
+    """Stop plugin-owned runtime resources before Binary Ninja tears down."""
+    global _runtime_shutdown
+    if _runtime_shutdown:
+        return
+    _runtime_shutdown = True
+
+    for timer in (_indicator_timer, _bv_monitor_timer):
+        try:
+            if timer is not None and hasattr(timer, "stop"):
+                timer.stop()
+        except Exception:
+            pass
+
+    try:
+        if plugin.server and plugin.server.is_running:
+            plugin.server.stop()
+    except Exception as exc:
+        try:
+            bn.log_debug(f"MCP shutdown cleanup failed: {exc}")
+        except Exception:
+            pass
+
+
+atexit.register(_shutdown_runtime)
 
 
 def _sidebar_icon_margin_default() -> int:
@@ -679,6 +709,14 @@ try:
                 _ensure_status_indicator()
                 _set_status_indicator(bool(plugin.server and plugin.server.is_running))
                 _start_indicator_watcher()
+            except Exception:
+                pass
+
+        def OnContextClose(self, *args):  # type: ignore[override]
+            try:
+                all_contexts = getattr(ui.UIContext, "allContexts", None)
+                if callable(all_contexts) and len(list(all_contexts())) <= 1:
+                    _shutdown_runtime()
             except Exception:
                 pass
 

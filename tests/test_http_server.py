@@ -115,6 +115,11 @@ class HTTPServerTests(unittest.TestCase):
 
             time.sleep(0.1)
             self.assertTrue(any("GET /slow" in message for message in self.logs["warn"]))
+
+            stop_started = time.monotonic()
+            self.server.stop()
+            self.assertLess(time.monotonic() - stop_started, 1.0)
+
             release_slow.set()
             slow_request.join(timeout=1)
             self.assertFalse(slow_request.is_alive())
