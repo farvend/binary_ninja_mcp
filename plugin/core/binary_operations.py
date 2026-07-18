@@ -329,56 +329,68 @@ class BinaryOperations:
             pass
 
         identifier_str = str(identifier).strip()
-        identifier_key = identifier_str.casefold()
+        identifier_candidates = [identifier_str]
+        try:
+            prefix = bn.Settings().get_string("mcp.renamePrefix")
+            if prefix and not identifier_str.startswith(prefix):
+                identifier_candidates.append(prefix + identifier_str)
+        except Exception:
+            pass
+        identifier_keys = {candidate.casefold() for candidate in identifier_candidates}
 
         view_key = self._view_filename(self._current_view) or str(id(self._current_view))
-        cached_address = self._renamed_function_addresses.get(view_key, {}).get(identifier_key)
-        if cached_address is not None:
-            func = self._current_view.get_function_at(cached_address)
-            if func:
-                bn.log_info(f"Found renamed function through address cache: {func.name}")
-                return func
+        cached_functions = self._renamed_function_addresses.get(view_key, {})
+        for candidate in identifier_candidates:
+            cached_address = cached_functions.get(candidate.casefold())
+            if cached_address is not None:
+                func = self._current_view.get_function_at(cached_address)
+                if func:
+                    bn.log_info(f"Found renamed function through address cache: {func.name}")
+                    return func
 
         indexed_lookup_available = False
         get_functions_by_name = getattr(self._current_view, "get_functions_by_name", None)
         if callable(get_functions_by_name):
             indexed_lookup_available = True
-            try:
-                functions = get_functions_by_name(identifier_str)
-                for func in functions or []:
-                    bn.log_info(f"Found function through name index: {func.name}")
-                    return func
-            except Exception:
-                pass
+            for candidate in identifier_candidates:
+                try:
+                    functions = get_functions_by_name(candidate)
+                    for func in functions or []:
+                        bn.log_info(f"Found function through name index: {func.name}")
+                        return func
+                except Exception:
+                    continue
 
         get_symbols_by_name = getattr(self._current_view, "get_symbols_by_name", None)
         if callable(get_symbols_by_name):
             indexed_lookup_available = True
-            try:
-                for symbol in get_symbols_by_name(identifier_str) or []:
-                    address = getattr(symbol, "address", None)
-                    if address is None:
-                        continue
-                    func = self._current_view.get_function_at(address)
-                    if func:
-                        bn.log_info(f"Found function through symbol index: {func.name}")
-                        return func
-            except Exception:
-                pass
+            for candidate in identifier_candidates:
+                try:
+                    for symbol in get_symbols_by_name(candidate) or []:
+                        address = getattr(symbol, "address", None)
+                        if address is None:
+                            continue
+                        func = self._current_view.get_function_at(address)
+                        if func:
+                            bn.log_info(f"Found function through symbol index: {func.name}")
+                            return func
+                except Exception:
+                    continue
 
         get_symbol_by_raw_name = getattr(self._current_view, "get_symbol_by_raw_name", None)
         if callable(get_symbol_by_raw_name):
             indexed_lookup_available = True
-            try:
-                symbol = get_symbol_by_raw_name(identifier_str)
-                address = getattr(symbol, "address", None)
-                if address is not None:
-                    func = self._current_view.get_function_at(address)
-                    if func:
-                        bn.log_info(f"Found function through raw symbol lookup: {func.name}")
-                        return func
-            except Exception:
-                pass
+            for candidate in identifier_candidates:
+                try:
+                    symbol = get_symbol_by_raw_name(candidate)
+                    address = getattr(symbol, "address", None)
+                    if address is not None:
+                        func = self._current_view.get_function_at(address)
+                        if func:
+                            bn.log_info(f"Found function through raw symbol lookup: {func.name}")
+                            return func
+                except Exception:
+                    continue
 
         # Older Binary Ninja versions lack indexed name APIs. Scan once while also
         # checking qualified symbol names instead of scanning functions twice.
@@ -392,7 +404,7 @@ class BinaryOperations:
                         for attribute in ("name", "raw_name", "full_name")
                     )
                 if any(
-                    str(name).casefold() == identifier_key
+                    str(name).casefold() in identifier_keys
                     for name in candidate_names
                     if name is not None
                 ):

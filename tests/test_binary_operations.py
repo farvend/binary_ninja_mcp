@@ -447,6 +447,25 @@ class BinaryOperationsTests(unittest.TestCase):
 
         self.assertIs(function, view.function)
 
+    def test_function_lookup_applies_configured_rename_prefix(self):
+        view = RenameThenCommentView()
+        self.operations._current_view = view
+        original_settings = self.module.bn.Settings
+        self.module.bn.Settings = lambda: types.SimpleNamespace(get_string=lambda _key: "mcp_")
+        try:
+            self.assertTrue(
+                self.operations.rename_function("0x401000", "mcp_MapForm_initialize_quest_ui")
+            )
+            self.assertTrue(
+                self.operations.set_function_comment(
+                    "MapForm_initialize_quest_ui", "quest UI initializer"
+                )
+            )
+        finally:
+            self.module.bn.Settings = original_settings
+
+        self.assertEqual(view.comments, {0x401000: "quest UI initializer"})
+
 
 if __name__ == "__main__":
     unittest.main()
