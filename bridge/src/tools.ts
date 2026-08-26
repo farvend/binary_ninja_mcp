@@ -47,7 +47,17 @@ const READ_ONLY_TOOLS = new Set([
   "convert_number",
 ]);
 
-const MUTATING_TOOLS = new Set([
+// MCP defines destructiveHint=false as "only additive updates". Keep this
+// list deliberately narrow: these tools change context or add analysis state
+// without replacing or deleting existing state.
+const ADDITIVE_MUTATING_TOOLS = new Set([
+  "select_binary",
+  "make_function_at",
+]);
+
+// These tools may replace, delete, or otherwise irreversibly alter analysis
+// state.
+const DESTRUCTIVE_TOOLS = new Set([
   "rename_function",
   "rename_single_variable",
   "rename_multi_variables",
@@ -60,13 +70,10 @@ const MUTATING_TOOLS = new Set([
   "declare_c_type",
   "retype_variable",
   "set_local_variable_type",
-  "select_binary",
   "set_function_prototype",
-  "make_function_at",
   "format_value",
+  "patch_bytes",
 ]);
-
-const DESTRUCTIVE_TOOLS = new Set(["patch_bytes"]);
 
 export function getToolAnnotations(name: string): ToolAnnotations {
   if (READ_ONLY_TOOLS.has(name)) {
@@ -77,10 +84,11 @@ export function getToolAnnotations(name: string): ToolAnnotations {
       openWorldHint: false,
     };
   }
-  if (MUTATING_TOOLS.has(name)) {
+  if (ADDITIVE_MUTATING_TOOLS.has(name)) {
     return {
       readOnlyHint: false,
       destructiveHint: false,
+      idempotentHint: true,
       openWorldHint: false,
     };
   }
@@ -88,6 +96,7 @@ export function getToolAnnotations(name: string): ToolAnnotations {
     return {
       readOnlyHint: false,
       destructiveHint: true,
+      idempotentHint: true,
       openWorldHint: false,
     };
   }
