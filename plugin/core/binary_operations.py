@@ -38,6 +38,13 @@ class BinaryOperations:
         else:
             bn.log_info("Cleared current binary view")
 
+    @staticmethod
+    def _view_filename(bv: bn.BinaryView | None) -> str | None:
+        try:
+            return str(bv.file.filename) if bv and bv.file else None
+        except Exception:
+            return None
+
     def load_binary(self, filepath: str) -> bn.BinaryView:
         """Load a binary file using the appropriate method based on the Binary Ninja API version"""
         try:
