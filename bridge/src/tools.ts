@@ -72,6 +72,7 @@ const DESTRUCTIVE_TOOLS = new Set([
   "set_local_variable_type",
   "set_function_prototype",
   "format_value",
+  "execute_python",
   "patch_bytes",
 ]);
 
@@ -96,8 +97,8 @@ export function getToolAnnotations(name: string): ToolAnnotations {
     return {
       readOnlyHint: false,
       destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
+      idempotentHint: name !== "execute_python",
+      openWorldHint: name === "execute_python",
     };
   }
   throw new Error(`Missing MCP annotations for tool: ${name}`);
@@ -1040,6 +1041,45 @@ export function registerTools(server: McpServer, client: BinjaHttpClient): void 
   );
 
   // ===== Binary Modification Tools =====
+
+  tool(
+    "execute_python",
+    "Execute Python in a persistent Binary Ninja scripting context. The code can use console magic variables such as bv, current_view, current_function, and here. Standard output, warnings, and errors are returned.",
+    {
+      code: z.string().min(1).describe("Python code to execute"),
+      timeout_seconds: z.number().min(0.1).max(300).default(30).describe("Execution timeout in seconds"),
+    },
+    async ({ code, timeout_seconds = 30 }) => {
+      type ExecutionResult = {
+        success?: boolean;
+        timed_out?: boolean;
+        output?: string;
+        warnings?: string;
+        errors?: string;
+        truncated?: boolean;
+        error?: string;
+      };
+      const result = await client.postJson<ExecutionResult>(
+        "executePython",
+        { code, timeout_seconds },
+        (timeout_seconds + 5) * 1000,
+      );
+      const execution = result as ExecutionResult;
+
+      if (!execution || (execution.error && !execution.output && !execution.errors)) {
+        return { content: [{ type: "text", text: `Error: ${execution?.error || "no response"}` }] };
+      }
+
+      const sections: string[] = [];
+      if (execution.output) sections.push(execution.output);
+      if (execution.warnings) sections.push(`Warnings:\n${execution.warnings}`);
+      if (execution.errors) sections.push(`Errors:\n${execution.errors}`);
+      if (execution.error) sections.push(`Error: ${execution.error}`);
+      if (execution.truncated) sections.push("[Output truncated after 1,000,000 characters]");
+      if (!sections.length) sections.push("(no output)");
+      return { content: [{ type: "text", text: sections.join("\n") }] };
+    }
+  );
 
   tool(
     "set_function_prototype",

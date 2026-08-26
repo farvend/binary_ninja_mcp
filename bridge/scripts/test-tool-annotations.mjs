@@ -21,7 +21,7 @@ try {
   );
   const destructive = tools.filter((tool) => tool.annotations?.destructiveHint);
 
-  assert.equal(tools.length, 54);
+  assert.equal(tools.length, 55);
   assert.deepEqual(missingAnnotations, []);
   assert.equal(readOnly.length, 37);
   assert.deepEqual(
@@ -35,6 +35,7 @@ try {
       "define_types",
       "delete_comment",
       "delete_function_comment",
+      "execute_python",
       "format_value",
       "patch_bytes",
       "rename_data",
@@ -48,6 +49,8 @@ try {
       "set_local_variable_type",
     ],
   );
+  assert.equal(tools.find((tool) => tool.name === "execute_python")?.annotations?.openWorldHint, true);
+  assert.equal(tools.find((tool) => tool.name === "execute_python")?.annotations?.idempotentHint, false);
   assert.equal(tools.find((tool) => tool.name === "patch_bytes")?.annotations?.idempotentHint, true);
 } finally {
   await client.close();
